@@ -1,7 +1,7 @@
 import axios from "axios";
 import { env } from "../config/env";
-import { authToken } from "./auth-token";
 import { emitUnauthorized } from "./auth-events";
+import { useAuthStore } from "@/stores/auth.store";
 
 export const http = axios.create({
   baseURL: env.VITE_API_BASE_URL,
@@ -12,7 +12,7 @@ export const http = axios.create({
 });
 
 http.interceptors.request.use((config) => {
-  const token = authToken.get();
+  const token = useAuthStore.getState().token;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -23,7 +23,7 @@ http.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      authToken.clear();
+      useAuthStore.getState().clearToken();
       emitUnauthorized();
     }
 

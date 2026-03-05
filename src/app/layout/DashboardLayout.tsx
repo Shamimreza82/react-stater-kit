@@ -1,15 +1,16 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { PATHS } from "../router/paths";
-import { authToken } from "../../services/auth-token";
 import { useUnauthorizedRedirect } from "../../hooks/use-unauthorized-redirect";
 import Seo from "../../components/seo/Seo";
+import { useAuthStore } from "@/stores/auth.store";
 
 const DashboardLayout = () => {
   const navigate = useNavigate();
   useUnauthorizedRedirect();
+  const clearToken = useAuthStore((state) => state.clearToken);
 
   const handleLogout = () => {
-    authToken.clear();
+    clearToken();
     void navigate(PATHS.LOGIN);
   };
 

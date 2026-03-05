@@ -1,9 +1,25 @@
-import { useState, type FormEvent } from "react";
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-misused-promises */
+import { useState } from "react";
+import axios from "axios";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PATHS } from "../../router/paths";
-import { authToken } from "../../../services/auth-token";
 import { authService } from "../../../services/auth.service";
 import Seo from "../../../components/seo/Seo";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { type LoginFormValues, loginSchema } from "./auth.schemas";
+import { useAuthStore } from "@/stores/auth.store";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -11,24 +27,31 @@ const Login = () => {
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const setToken = useAuthStore((state) => state.setToken);
 
-  const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  const handleLogin = async (values: LoginFormValues) => {
     setErrorMessage(null);
     setIsSubmitting(true);
 
-    const formData = new FormData(e.currentTarget);
-    const emailValue = formData.get("email");
-    const passwordValue = formData.get("password");
-    const email = typeof emailValue === "string" ? emailValue : "";
-    const password = typeof passwordValue === "string" ? passwordValue : "";
-
     try {
-      const data = await authService.login({ email, password });
-      authToken.set(data.accessToken);
+      const data = await authService.login(values);
+      setToken(data.accessToken);
       void navigate(from || PATHS.DASHBOARD, { replace: true });
-    } catch {
-      setErrorMessage("Login failed. Please check credentials and try again.");
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        const apiMessage = typeof error.response?.data?.message === "string" ? error.response.data.message : null;
+        setErrorMessage(apiMessage ?? "Login failed. Please check credentials and try again.");
+      } else {
+        setErrorMessage("Login failed. Please check credentials and try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -49,43 +72,61 @@ const Login = () => {
           <h1 className="text-3xl font-semibold">Login</h1>
           <p className="mt-2 text-sm text-slate-300">Welcome back to Nova.</p>
 
-          <form
-            className="mt-6 space-y-4"
-            onSubmit={(e) => {
-              void handleLogin(e);
-            }}
-          >
-            <div>
-              <label className="mb-1 block text-sm text-slate-200">Email</label>
-              <input
-                name="email"
-                type="email"
-                required
-                className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2 text-sm outline-none ring-cyan-300/40 focus:ring"
-                placeholder="you@example.com"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-slate-200">Password</label>
-              <input
-                name="password"
-                type="password"
-                required
-                className="w-full rounded-lg border border-white/15 bg-slate-950 px-3 py-2 text-sm outline-none ring-cyan-300/40 focus:ring"
-                placeholder="********"
-              />
-            </div>
-
-            {errorMessage && <p className="text-sm text-red-300">{errorMessage}</p>}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-lg bg-cyan-400 px-4 py-2 font-medium text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+          <Form {...form}>
+            <form
+              className="mt-6 space-y-4"
+              onSubmit={form.handleSubmit((values) => {
+                void handleLogin(values);
+              })}
             >
-              {isSubmitting ? "Signing in..." : "Login"}
-            </button>
-          </form>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-slate-200">Email</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="you@example.com"
+                        className="border-white/15 bg-slate-950 text-slate-100 placeholder:text-slate-400"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-red-300" />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-slate-200">Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="********"
+                        className="border-white/15 bg-slate-950 text-slate-100 placeholder:text-slate-400"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-red-300" />
+                  </FormItem>
+                )}
+              />
+
+              {errorMessage && <p className="text-sm text-red-300">{errorMessage}</p>}
+
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+              >
+                {isSubmitting ? "Signing in..." : "Login"}
+              </Button>
+            </form>
+          </Form>
 
           <p className="mt-4 text-sm text-slate-300">
             Don&apos;t have an account?{" "}
